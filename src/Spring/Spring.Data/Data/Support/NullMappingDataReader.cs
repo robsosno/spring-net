@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data.Support
 {
@@ -32,6 +33,7 @@ namespace Spring.Data.Support
 		#region Fields
 
 	    protected IDataReader dataReader;
+        protected DbDataReader dbDataReader;
 	    private bool alreadyDisposed = false;
 
 		#endregion
@@ -52,6 +54,7 @@ namespace Spring.Data.Support
 	    public NullMappingDataReader(IDataReader dataReader)
 	    {
 	        this.dataReader = dataReader;
+            this.dbDataReader = dataReader as DbDataReader;
 	    }
 
 		#endregion
@@ -124,6 +127,16 @@ namespace Spring.Data.Support
         public bool Read()
         {
             return dataReader.Read();
+        }
+
+        public async Task<bool> ReadAsync()
+        {
+            return await dbDataReader.ReadAsync().ConfigureAwait(false);
+        }
+
+        public async Task<bool> ReadAsync(CancellationToken cancellationToken)
+        {
+            return await dbDataReader.ReadAsync(cancellationToken).ConfigureAwait(false);
         }
 
         public int Depth

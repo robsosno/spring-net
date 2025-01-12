@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 
 namespace Spring.Data
@@ -37,4 +38,5 @@ namespace Spring.Data
     /// by the AdoTemplate.</param>
     /// <returns>An arbitrary result object or null if none.</returns>
     public delegate object ResultSetExtractorDelegate(IDataReader reader);
+    public delegate Task<object> ResultSetExtractorDelegateAsync(DbDataReader reader);
 }

@@ -352,6 +352,123 @@ namespace Spring.Data.Core
 
         }
 
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a delegate callback.
+        /// </summary>
+        /// <param name="del">The delegate called with a command object.</param>
+        /// <returns>
+        /// A result object returned by the action or null
+        /// </returns>
+        /// <remarks>This allows for implementing arbitrary data access operations
+        /// on a single command within Spring's managed ADO.NET environment.</remarks>
+        public virtual async Task<object> ExecuteAsync(CommandDelegateAsync del)
+        {
+            return await ExecuteAsync(new ExecuteCommandCallbackUsingDelegateAsync(del)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Callback to execute a IDbCommand.
+        /// </summary>
+        /// <param name="action">the callback to execute</param>
+        /// <returns>object returned from callback</returns>
+        public virtual async Task<object> ExecuteAsync(ICommandCallbackAsync action)
+        {
+            ConnectionTxPair connectionTxPairToUse = GetConnectionTxPair(DbProvider);
+
+            DbCommand command = null;
+            try
+            {
+                command = (DbCommand) DbProvider.CreateCommand();
+                command.Connection = (DbConnection) connectionTxPairToUse.Connection;
+                command.Transaction = (DbTransaction) connectionTxPairToUse.Transaction;
+                //TODO collect warnings...
+                //RegisterEventHandlers(command.Connection);
+                ApplyCommandSettings(command);
+                Object result = await action.DoInCommandAsync(command).ConfigureAwait(false);
+                //SqlWarnings sqlWarnings = GetSqlWarnings()
+                //ThrowExceptionOnWarningIfNotIgnoringWarnings(sqlWarnings);
+                return result;
+            }
+            catch (Exception e)
+            {
+                DisposeCommand(command);
+                command = null;
+                DisposeConnection(connectionTxPairToUse.Connection, DbProvider);
+                connectionTxPairToUse.Connection = null;
+                if (DbProvider.IsDataAccessException(e))
+                {
+                    throw ExceptionTranslator.Translate("CommandCallback", GetCommandText(action), e);
+                }
+                else
+                {
+                    throw;
+                }
+
+
+            }
+            finally
+            {
+                DisposeCommand(command);
+                DisposeConnection(connectionTxPairToUse.Connection, DbProvider);
+            }
+
+        }
+
+        /// <summary>
+        /// Executes ADO.NET operations on a command object, created by the provided IDbCommandCreator,
+        /// using the interface based callback IDbCommandCallback.
+        /// </summary>
+        /// <param name="commandCreator">The command creator.</param>
+        /// <param name="action">The callback to execute based on IDbCommand</param>
+        /// <returns>A result object returned by the action or null</returns>
+        public virtual async Task<object> ExecuteAsync(IDbCommandCreator commandCreator, ICommandCallbackAsync action)
+        {
+            AssertUtils.ArgumentNotNull(commandCreator, "commandCreator", "IDbCommandCreator must not be null");
+            AssertUtils.ArgumentNotNull(action, "action", "Callback object must not be null");
+
+            ConnectionTxPair connectionTxPairToUse = GetConnectionTxPair(DbProvider);
+
+
+            DbCommand command = null;
+            try
+            {
+                command = (DbCommand) commandCreator.CreateDbCommand(DbProvider);
+                command.Connection = (DbConnection) connectionTxPairToUse.Connection;
+                command.Transaction = (DbTransaction) connectionTxPairToUse.Transaction;
+                ApplyCommandSettings(command);
+                //TODO collect warnings...
+                //RegisterEventHandlers(command.Connection);
+                Object result = await action.DoInCommandAsync(command).ConfigureAwait(false);
+
+                //SqlWarnings sqlWarnings = GetSqlWarnings()
+                //ThrowExceptionOnWarningIfNotIgnoringWarnings(sqlWarnings);
+
+                return result;
+            }
+            catch (Exception e)
+            {
+                commandCreator = null;
+                DisposeCommand(command);
+                command = null;
+                DisposeConnection(connectionTxPairToUse.Connection, DbProvider);
+                connectionTxPairToUse.Connection = null;
+                if (DbProvider.IsDataAccessException(e))
+                {
+                    throw ExceptionTranslator.Translate("CommandCallback", GetCommandText(action), e);
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            finally
+            {
+                DisposeCommand(command);
+                DisposeConnection(connectionTxPairToUse.Connection, DbProvider);
+            }
+
+        }
+
         #endregion
 
         #region ExecuteNonQuery
@@ -457,6 +574,106 @@ namespace Spring.Data.Core
 
         }
 
+        /// <summary>
+        /// Executes a non query returning the number of rows affected.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <returns>The number of rows affected.</returns>
+        public virtual async Task<int> ExecuteNonQueryAsync(CommandType cmdType, string cmdText)
+        {
+            #region Instrumentation
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing NonQuery " + cmdType + "[" + cmdText + "]");
+            }
+            #endregion
+
+            return (int) await ExecuteAsync(new ExecuteNonQueryCallbackWithParametersAsync(cmdType, cmdText, null)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Executes a non query returning the number of rows affected.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns>The number of rows affected.</returns>
+        public virtual async Task<int> ExecuteNonQueryAsync(CommandType cmdType, string cmdText,
+                                           string parameterName, Enum dbType, int size, object parameterValue)
+        {
+            return (int) await ExecuteAsync(new ExecuteNonQueryCallbackWithParametersAsync(cmdType, cmdText,
+                                                                          CreateDbParameters(parameterName, dbType, size, parameterValue))).ConfigureAwait(false);
+
+
+        }
+
+        /// <summary>
+        /// Executes a non query returning the number of rows affected.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="parameters">The parameter collection to map.</param>
+        /// <returns>The number of rows affected.</returns>
+        public virtual async Task<int> ExecuteNonQueryAsync(CommandType cmdType, string cmdText,
+                                           IDbParameters parameters)
+        {
+            #region Instrumentation
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing NonQuery.  " + cmdType + "[" + cmdText + "]");
+            }
+            #endregion
+
+            return (int) await ExecuteAsync(new ExecuteNonQueryCallbackWithParametersAsync(cmdType, cmdText, parameters)).ConfigureAwait(false);
+
+        }
+
+        /// <summary>
+        /// Executes a non query with parameters set via the
+        /// command setter, returning the number of rows affected.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The number of rows affected.</returns>
+        public virtual async Task<int> ExecuteNonQueryAsync(CommandType cmdType, string cmdText,
+                                           ICommandSetter commandSetter)
+        {
+            #region Instrumentation
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing NonQuery. " + cmdType + "[" + cmdText + "]");
+            }
+            #endregion
+
+            return (int) await ExecuteAsync(new ExecuteNonQueryCallbackWithCommandSetterAsync(cmdType, cmdText, commandSetter)).ConfigureAwait(false);
+        }
+
+
+        /// <summary>
+        /// Executes a non query with a command created via IDbCommandCreator and
+        /// parameters.
+        /// </summary>
+        /// <remarks>Output parameters can be retrieved via the returned
+        /// dictionary.
+        /// <para>
+        /// More commonly used as a lower level support method within the framework,
+        /// for example StoredProcedure/AdoScalar.
+        /// </para>
+        /// </remarks>
+        /// <param name="commandCreator">The callback to create a IDbCommand.</param>
+        /// <returns>The number of rows affected.</returns>
+        public virtual async Task<IDictionary> ExecuteNonQueryAsync(IDbCommandCreator commandCreator)
+        {
+
+            return (IDictionary) await ExecuteAsync(commandCreator, new AdoNonQueryWithOutputParamsCommandCallbackAsync()).ConfigureAwait(false);
+
+        }
+
         #endregion
 
         #region ExecuteScalar
@@ -547,6 +764,92 @@ namespace Spring.Data.Core
             return (IDictionary)Execute(commandCreator, new AdoStoredProcedureScalarCommandCallback());
         }
 
+        /// <summary>
+        /// Execute the query with the specified command text.
+        /// </summary>
+        /// <remarks>No parameters are used.  As with
+        /// IDbCommand.ExecuteScalar, it returns the first column of the first row in the resultset
+        /// returned by the query.  Extra columns or row are ignored.</remarks>
+        /// <param name="cmdType">The command type</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <returns>The first column of the first row in the result set</returns>
+        public virtual async Task<object> ExecuteScalarAsync(CommandType cmdType, string cmdText)
+        {
+            return await ExecuteAsync(new ExecuteScalarCallbackWithParametersAsync(cmdType, cmdText, null)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Execute the query with the specified command text and parameter returning a scalar result
+        /// </summary>
+        /// <param name="cmdType">The command type</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns>The first column of the first row in the result set</returns>
+        public virtual async Task<object> ExecuteScalarAsync(CommandType cmdType, string cmdText,
+                                            string parameterName, Enum dbType, int size, object parameterValue)
+        {
+            return await ExecuteAsync(new ExecuteScalarCallbackWithParametersAsync(cmdType, cmdText,
+                                                                   CreateDbParameters(parameterName, dbType, size, parameterValue))).ConfigureAwait(false);
+
+        }
+
+
+        /// <summary>
+        /// Execute the query with the specified command text and parameters returning a scalar result
+        /// </summary>
+        /// <param name="cmdType">The command type</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="parameters">The parameter collection to map.</param>
+        /// <returns>The first column of the first row in the result set</returns>
+        public virtual async Task<object> ExecuteScalarAsync(CommandType cmdType, string cmdText,
+                                    IDbParameters parameters)
+        {
+            return await ExecuteAsync(new ExecuteScalarCallbackWithParametersAsync(cmdType, cmdText, parameters)).ConfigureAwait(false);
+
+        }
+
+        /// <summary>
+        /// Execute the query with the specified command text and parameters set via the
+        /// command setter, returning a scalar result
+        /// </summary>
+        /// <param name="cmdType">The command type</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The first column of the first row in the result set</returns>
+        public virtual async Task<object> ExecuteScalarAsync(CommandType cmdType, string cmdText,
+                                    ICommandSetter commandSetter)
+        {
+            #region Instrumentation
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing ExecuteScalar. " + cmdType + "[" + cmdText + "]");
+            }
+            #endregion
+
+            return await ExecuteAsync(new ExecuteScalarCallbackWithCommandSetterAsync(cmdType, cmdText, commandSetter)).ConfigureAwait(false);
+
+        }
+
+        /// <summary>
+        /// Execute the query with a command created via IDbCommandCreator and
+        /// parameters
+        /// </summary>
+        /// <remarks>Output parameters can be retrieved via the returned
+        /// dictionary.
+        /// <para>
+        /// More commonly used as a lower level support method within the framework,
+        /// for example for StoredProcedure/AdoScalar.
+        /// </para></remarks>
+        /// <param name="commandCreator">The callback to create a IDbCommand.</param>
+        /// <returns>A dictionary containing output parameters, if any</returns>
+        public virtual async Task<IDictionary> ExecuteScalarAsync(IDbCommandCreator commandCreator)
+        {
+            return (IDictionary) await ExecuteAsync(commandCreator, new AdoStoredProcedureScalarCommandCallbackAsync()).ConfigureAwait(false);
+        }
+
         #endregion
 
         #region Query with RowCallback
@@ -610,6 +913,65 @@ namespace Spring.Data.Core
             QueryWithResultSetExtractor(cmdType, cmdText, new RowCallbackResultSetExtractor(rowCallback), parameters);
         }
 
+        /// <summary>
+        /// Execute a query given IDbCommand's type and text, reading a
+        /// single result set on a per-row basis with a <see cref="IRowCallback"/>.
+        /// </summary>
+        /// <param name="cmdType">The type of command</param>
+        /// <param name="cmdText">The text of the query.</param>
+        /// <param name="rowCallback">callback that will extract results
+        /// one row at a time.
+        /// </param>
+        public virtual async Task QueryWithRowCallbackAsync(CommandType cmdType, string cmdText, IRowCallback rowCallback)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowCallbackResultSetExtractor(rowCallback)).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Execute a query given IDbCommand's type and text by
+        /// passing the created IDbCommand to a ICommandSetter implementation
+        /// that knows how to bind values to the IDbCommand, reading a
+        /// single result set on a per-row basis with a <see cref="IRowCallback"/>.
+        /// </summary>
+        /// <param name="cmdType">The type of command</param>
+        /// <param name="cmdText">The text of the query.</param>
+        /// <param name="rowCallback">callback that will extract results
+        /// one row at a time.
+        /// </param>
+        /// <param name="commandSetter">The command setter.</param>
+        public virtual async Task QueryWithRowCallbackAsync(CommandType cmdType, string cmdText, IRowCallback rowCallback,
+                                                 ICommandSetter commandSetter)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowCallbackResultSetExtractor(rowCallback), commandSetter).ConfigureAwait(false);
+
+        }
+
+        /// <summary>
+        /// Execute a query given IDbCommand's type and text and provided parameter
+        /// information, reading a
+        /// single result set on a per-row basis with a <see cref="IRowCallback"/>.
+        /// </summary>
+        /// <param name="cmdType">The type of command</param>
+        /// <param name="cmdText">The text of the query.</param>
+        /// <param name="rowCallback">callback that will extract results
+        /// one row at a time.
+        /// </param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        public virtual async Task QueryWithRowCallbackAsync(CommandType cmdType, string cmdText, IRowCallback rowCallback,
+                                         string parameterName, Enum dbType, int size, object parameterValue)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowCallbackResultSetExtractor(rowCallback), parameterName, dbType, size, parameterValue).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task QueryWithRowCallbackAsync(CommandType cmdType, string cmdText, IRowCallback rowCallback, IDbParameters parameters)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowCallbackResultSetExtractor(rowCallback), parameters).ConfigureAwait(false);
+        }
+
         #endregion
 
         // RowCallback with Delegate Questionable for 1.1 since no anonymous delegates and there isn't a collecting parameter
@@ -638,6 +1000,30 @@ namespace Spring.Data.Core
         public virtual void QueryWithRowCallbackDelegate(CommandType cmdType, string sql, RowCallbackDelegate rowCallbackDelegate, IDbParameters parameters)
         {
             QueryWithResultSetExtractor(cmdType, sql, new RowCallbackResultSetExtractor(rowCallbackDelegate), parameters);
+
+        }
+
+        public virtual async Task QueryWithRowCallbackDelegateAsync(CommandType cmdType, string sql, RowCallbackDelegate rowCallbackDelegate)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, sql, new RowCallbackResultSetExtractor(rowCallbackDelegate)).ConfigureAwait(false);
+
+        }
+        public virtual async Task QueryWithRowCallbackDelegateAsync(CommandType cmdType, string sql, RowCallbackDelegate rowCallbackDelegate, ICommandSetter commandSetter)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, sql, new RowCallbackResultSetExtractor(rowCallbackDelegate), commandSetter).ConfigureAwait(false);
+
+        }
+
+        public virtual async Task QueryWithRowCallbackDelegateAsync(CommandType cmdType, string sql, RowCallbackDelegate rowCallbackDelegate,
+                                                 string name, Enum dbType, int size, object parameterValue)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, sql, new RowCallbackResultSetExtractor(rowCallbackDelegate), name, dbType, size, parameterValue).ConfigureAwait(false);
+
+        }
+
+        public virtual async Task QueryWithRowCallbackDelegateAsync(CommandType cmdType, string sql, RowCallbackDelegate rowCallbackDelegate, IDbParameters parameters)
+        {
+            await QueryWithResultSetExtractorAsync(cmdType, sql, new RowCallbackResultSetExtractor(rowCallbackDelegate), parameters).ConfigureAwait(false);
 
         }
 
@@ -673,6 +1059,32 @@ namespace Spring.Data.Core
             return (IList)QueryWithResultSetExtractor(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapper), parameters);
         }
 
+        public virtual async Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapper)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, ICommandSetter commandSetter)
+        {
+
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText,
+                                                      new RowMapperResultSetExtractor(rowMapper), commandSetter).ConfigureAwait(false);
+
+        }
+
+
+        public virtual async Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper,
+                                                string name, Enum dbType, int size, object parameterValue)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapper), name, dbType, size, parameterValue).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, IDbParameters parameters)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapper), parameters).ConfigureAwait(false);
+        }
+
 
         #endregion
 
@@ -700,6 +1112,30 @@ namespace Spring.Data.Core
                                                         IDbParameters parameters)
         {
             return (IList)QueryWithResultSetExtractor(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapperDelegate), parameters);
+        }
+
+        public virtual async Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapperDelegate)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, ICommandSetter commandSetter)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapperDelegate), commandSetter).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate,
+                                                        string parameterName, Enum dbType, int size, object parameterValue)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapperDelegate), parameterName, dbType, size, parameterValue).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate,
+                                                        IDbParameters parameters)
+        {
+            return (IList) await QueryWithResultSetExtractorAsync(cmdType, cmdText, new RowMapperResultSetExtractor(rowMapperDelegate), parameters).ConfigureAwait(false);
         }
 
         #endregion
@@ -749,6 +1185,51 @@ namespace Spring.Data.Core
         {
             AssertUtils.ArgumentNotNull(resultSetExtractor, "resultSetExtractor", "Result Set Extractor must not be null");
             return Execute(new QueryCallback(this, cmdType, cmdText, resultSetExtractor, parameters));
+        }
+
+        /// <summary>
+        /// Execute a query given static SQL/Stored Procedure name
+        /// and process a single result set with an instance of IResultSetExtractor
+        /// </summary>
+        /// <param name="cmdType">The type of command.</param>
+        /// <param name="sql">The SQL/Stored Procedure to execute</param>
+        /// <param name="rse">Object that will extract all rows of a result set</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        public virtual async Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string sql, IResultSetExtractor rse)
+        {
+            AssertUtils.ArgumentNotNull(sql, "sql", "SQL must not be null");
+
+            //TODO check for parameter placeholders...
+
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing SQL [" + sql + "]");
+            }
+
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, sql, rse, null)).ConfigureAwait(false);
+
+        }
+
+        public virtual async Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor, ICommandSetter commandSetter)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractor, "resultSetExtractor", "Result Set Extractor must not be null");
+            return await ExecuteAsync(new QueryCallbackWithCommandSetterAsync(this, cmdType, cmdText,
+                                                              resultSetExtractor, commandSetter)).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
+                                                          string name, Enum dbType, int size, object parameterValue)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractor, "resultSetExtractor", "Result Set Extractor must not be null");
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, cmdText, resultSetExtractor, CreateDbParameters(name, dbType, size, parameterValue))).ConfigureAwait(false);
+        }
+
+        public virtual async Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
+                                                          IDbParameters parameters)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractor, "resultSetExtractor", "Result Set Extractor must not be null");
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, cmdText, resultSetExtractor, parameters)).ConfigureAwait(false);
         }
 
 
@@ -801,6 +1282,52 @@ namespace Spring.Data.Core
         {
             AssertUtils.ArgumentNotNull(resultSetExtractorDelegate, "resultSetExtractorDelegate", "Result set extractor delegate must not be null");
             return Execute(new QueryCallback(this, cmdType, cmdText, resultSetExtractorDelegate, parameters));
+        }
+
+        /// <summary>
+        /// Execute a query given static SQL/Stored Procedure name
+        /// and process a single result set with an instance of IResultSetExtractor
+        /// </summary>
+        /// <param name="cmdType">The type of command.</param>
+        /// <param name="sql">The SQL/Stored Procedure to execute</param>
+        /// <param name="resultSetExtractorDelegate">Delegate that will extract all rows of a result set</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        public virtual async Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string sql, ResultSetExtractorDelegateAsync resultSetExtractorDelegate)
+        {
+            AssertUtils.ArgumentNotNull(sql, "sql", "SQL must not be null");
+
+            //TODO check for parameter placeholders...
+
+            if (LOG.IsDebugEnabled)
+            {
+                LOG.Debug("Executing SQL [" + sql + "]");
+            }
+
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, sql, resultSetExtractorDelegate, null)).ConfigureAwait(false);
+
+        }
+
+        public virtual async Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                          ICommandSetter commandSetter)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractorDelegate, "resultSetExtractorDelegate", "Result set extractor delegate must not be null");
+            return await ExecuteAsync(new QueryCallbackWithCommandSetterAsync(this, cmdType, cmdText,
+                                                              resultSetExtractorDelegate, commandSetter)).ConfigureAwait(false);
+        }
+
+
+        public virtual async Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                                  string name, Enum dbType, int size, object parameterValue)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractorDelegate, "resultSetExtractorDelegate", "Result set extractor delegate must not be null");
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, cmdText, resultSetExtractorDelegate, CreateDbParameters(name, dbType, size, parameterValue))).ConfigureAwait(false);
+        }
+
+        public virtual async Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                                  IDbParameters parameters)
+        {
+            AssertUtils.ArgumentNotNull(resultSetExtractorDelegate, "resultSetExtractorDelegate", "Result set extractor delegate must not be null");
+            return await ExecuteAsync(new QueryCallbackAsync(this, cmdType, cmdText, resultSetExtractorDelegate, parameters)).ConfigureAwait(false);
         }
 
 
@@ -892,6 +1419,93 @@ namespace Spring.Data.Core
                                              object parameterValue)
         {
             IList results = QueryWithRowMapper(cmdType, cmdText, rowMapper, parameterName, dbType, size, parameterValue);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text, mapping a single result
+        /// row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper)
+        {
+            IList results = await QueryWithRowMapperAsync(cmdType, cmdText, rowMapper).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters set via the
+        /// command setter, mapping a single result row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, ICommandSetter commandSetter)
+        {
+            IList results = await QueryWithRowMapperAsync(cmdType, cmdText, rowMapper, commandSetter).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="parameters">The parameter collection to use in the query.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, IDbParameters parameters)
+        {
+            IList results = await QueryWithRowMapperAsync(cmdType, cmdText, rowMapper, parameters).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameter, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, string parameterName, Enum dbType, int size,
+                                             object parameterValue)
+        {
+            IList results = await QueryWithRowMapperAsync(cmdType, cmdText, rowMapper, parameterName, dbType, size, parameterValue).ConfigureAwait(false);
             return DataAccessUtils.RequiredUniqueResultSet(results);
         }
 
@@ -987,6 +1601,94 @@ namespace Spring.Data.Core
             return DataAccessUtils.RequiredUniqueResultSet(results);
         }
 
+        /// <summary>
+        /// Execute a query with the specified command text, mapping a single result
+        /// row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate)
+        {
+            IList results = await QueryWithRowMapperDelegateAsync(cmdType, cmdText, rowMapperDelegate).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters set via the
+        /// command setter, mapping a single result row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, ICommandSetter commandSetter)
+        {
+            IList results = await QueryWithRowMapperDelegateAsync(cmdType, cmdText, rowMapperDelegate, commandSetter).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="parameters">The parameter collection to use in the query.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, IDbParameters parameters)
+        {
+            IList results = await QueryWithRowMapperDelegateAsync(cmdType, cmdText, rowMapperDelegate, parameters).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameter, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        public virtual async Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, string parameterName, Enum dbType, int size,
+                                                     object parameterValue)
+        {
+            IList results = await QueryWithRowMapperDelegateAsync(cmdType, cmdText, rowMapperDelegate, parameterName, dbType, size, parameterValue).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
         #endregion
 
         #region Query with CommandCreator
@@ -1041,6 +1743,58 @@ namespace Spring.Data.Core
         public IDictionary QueryWithCommandCreator(IDbCommandCreator cc, IList namedResultSetProcessors)
         {
             return (IDictionary)Execute(cc, new AdoResultProcessorsQueryCommandCallback(this, namedResultSetProcessors));
+        }
+
+        public virtual async Task<object> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IResultSetExtractor rse)
+        {
+            return await QueryWithCommandCreatorAsync(cc, rse, null).ConfigureAwait(false);
+        }
+
+        public virtual async Task QueryWithCommandCreatorAsync(IDbCommandCreator cc, IRowCallback rowCallback)
+        {
+            await QueryWithCommandCreatorAsync(cc, rowCallback, null).ConfigureAwait(false);
+        }
+
+        public virtual async Task<IList> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IRowMapper rowMapper)
+        {
+            return await QueryWithCommandCreatorAsync(cc, rowMapper, null).ConfigureAwait(false);
+        }
+
+        public virtual async Task<object> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IResultSetExtractor rse, IDictionary returnedParameters)
+        {
+            if (rse == null)
+            {
+                throw new ArgumentNullException("Result Set Extractor must not be null");
+            }
+
+            return await ExecuteAsync(cc, new AdoResultSetExtractorWithOutputParamsCommandCallbackAsync(this, rse, returnedParameters)).ConfigureAwait(false);
+        }
+
+        public virtual async Task QueryWithCommandCreatorAsync(IDbCommandCreator cc, IRowCallback rowCallback, IDictionary returnedParameters)
+        {
+            if (rowCallback == null)
+            {
+                throw new ArgumentNullException("RowCallback must not be null");
+            }
+            await ExecuteAsync(cc, new AdoRowCallbackCommandCallbackAsync(this, rowCallback, returnedParameters)).ConfigureAwait(false);
+        }
+
+        public virtual async Task<IList> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IRowMapper rowMapper, IDictionary returnedParameters)
+        {
+            if (rowMapper == null)
+            {
+                throw new ArgumentNullException("rowMapper must not be null");
+            }
+
+            return (IList) await ExecuteAsync(cc, new AdoRowMapperQueryCommandCallbackAsync(this, rowMapper, returnedParameters)).ConfigureAwait(false);
+        }
+
+
+
+
+        public async Task<IDictionary> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IList namedResultSetProcessors)
+        {
+            return (IDictionary) await ExecuteAsync(cc, new AdoResultProcessorsQueryCommandCallbackAsync(this, namedResultSetProcessors)).ConfigureAwait(false);
         }
 
         #endregion
@@ -1792,6 +2546,12 @@ namespace Spring.Data.Core
         public override IDataParameter[] DeriveParameters(string procedureName, bool includeReturnParameter)
         {
             return (IDataParameter[])Execute(new DeriveParametersCommandCallback(DbProvider, procedureName, includeReturnParameter));
+
+        }
+
+        public override async Task<IDataParameter[]> DeriveParametersAsync(string procedureName, bool includeReturnParameter)
+        {
+            return (IDataParameter[]) await ExecuteAsync(new DeriveParametersCommandCallbackAsync(DbProvider, procedureName, includeReturnParameter)).ConfigureAwait(false);
 
         }
 
@@ -3021,6 +3781,565 @@ namespace Spring.Data.Core
             }
         }
 
+        private class AdoStoredProcedureScalarCommandCallbackAsync : ICommandCallbackAsync
+        {
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                IDictionary returnedResults = new Hashtable();
+                object scalar = await command.ExecuteScalarAsync().ConfigureAwait(false);
+                ParameterUtils.ExtractOutputParameters(returnedResults, command);
+                returnedResults.Add("scalar", scalar);
+                return returnedResults;
+
+            }
+        }
+
+        private class AdoNonQueryWithOutputParamsCommandCallbackAsync : ICommandCallbackAsync
+        {
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                IDictionary returnedResults = new Hashtable();
+                int rowsAffected = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                ParameterUtils.ExtractOutputParameters(returnedResults, command);
+                returnedResults.Add("rowsAffected", rowsAffected);
+                return returnedResults;
+
+            }
+        }
+
+
+        private class AdoResultProcessorsQueryCommandCallbackAsync : ICommandCallbackAsync
+        {
+            private AdoTemplate adoTemplate;
+            private IList namedResultSetProcessors;
+            //private IDbParameters declaredParameters;
+
+            public AdoResultProcessorsQueryCommandCallbackAsync(AdoTemplate adoTemplate, IList namedResultSetProcessors)
+            {
+                //AssertUtils.ArgumentHasLength(namedResultSetProcessors, "namedResultSetProcessors");
+
+                this.adoTemplate = adoTemplate;
+                this.namedResultSetProcessors = namedResultSetProcessors;
+                //this.declaredParameters = declaredParameters;
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                IDictionary returnedResults = new Hashtable();
+                int resultSetIndex = 0;
+                DbDataReader reader = null;
+                try
+                {
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+
+                    //TODO On >= .NET 2.0 platforms make use of DbDataReader.HasRows property to
+                    //     see if there is a result set.  now currently assuming matching
+                    //     NamedResultSetProcessor/ResultSet pairs.
+
+                    do
+                    {
+                        if (namedResultSetProcessors.Count == 0)
+                        {
+                            //We could just have output parameters and/or return value, that is, no result sets
+                            //If we didn't register a result set processor, it is likely that a result set wasn't expected.
+                            break;
+                        }
+                        NamedResultSetProcessor namedResultSetProcessor = null;
+                        try
+                        {
+                            namedResultSetProcessor
+                                = namedResultSetProcessors[resultSetIndex] as NamedResultSetProcessor;
+                            //Will only have possibility of run-time type error if using QueryWithCommandCreator
+                            if (namedResultSetProcessor == null)
+                            {
+                                LOG.Error("NamedResultSetProcessor for result set index " + resultSetIndex +
+                                          ", is not of expected type NamedResultSetProcessor.  Type = " +
+                                          namedResultSetProcessors[resultSetIndex].GetType() +
+                                          "; Skipping processing for this result set.");
+                                continue;
+                            }
+                        }
+                        catch (IndexOutOfRangeException e)
+                        {
+                            LOG.Error("No NamedResultSetProcessor associated with result set index " + resultSetIndex, e);
+                            continue;
+                        }
+                        catch (ArgumentOutOfRangeException e)
+                        {
+                            LOG.Error("No NamedResultSetProcessor associated with result set index " + resultSetIndex, e);
+                            continue;
+                        }
+
+
+                        string parameterName = namedResultSetProcessor.Name;
+                        if (namedResultSetProcessor.ResultSetProcessor is IResultSetExtractor)
+                        {
+                            IResultSetExtractor rse = (IResultSetExtractor) namedResultSetProcessor.ResultSetProcessor;
+                            object result = await rse.ExtractDataAsync(reader).ConfigureAwait(false);
+                            returnedResults.Add(parameterName, result);
+                        }
+                        else if (namedResultSetProcessor.ResultSetProcessor is IRowMapper)
+                        {
+                            IRowMapper rowMapper = (IRowMapper) namedResultSetProcessor.ResultSetProcessor;
+                            object result = await (new RowMapperResultSetExtractor(rowMapper)).ExtractDataAsync(reader).ConfigureAwait(false);
+                            returnedResults.Add(parameterName, result);
+                        }
+                        else if (namedResultSetProcessor.ResultSetProcessor is IRowCallback)
+                        {
+                            IRowCallback rowCallback = (IRowCallback) namedResultSetProcessor.ResultSetProcessor;
+                            await (new RowCallbackResultSetExtractor(rowCallback)).ExtractDataAsync(reader).ConfigureAwait(false);
+                            returnedResults.Add(parameterName, "ResultSet returned was processed by an IRowCallback");
+                        }
+                        resultSetIndex++;
+
+                    } while (reader.NextResult());
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                }
+                ParameterUtils.ExtractOutputParameters(returnedResults, command);
+                return returnedResults;
+            }
+        }
+
+
+        private class DeriveParametersCommandCallbackAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private IDbProvider provider;
+            private string procedureName;
+            private bool includeReturnParameter;
+
+            public DeriveParametersCommandCallbackAsync(IDbProvider provider, string procedureName, bool includeReturnParameter)
+            {
+                this.provider = provider;
+                this.procedureName = procedureName;
+                this.includeReturnParameter = includeReturnParameter;
+            }
+
+            public string CommandText
+            {
+                get { return procedureName; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                command.CommandType = CommandType.StoredProcedure;
+                command.CommandText = procedureName;
+
+                //The DeriveParameter is static in all providers...it seems....
+                Type commandBuilderType = provider.DbMetadata.CommandBuilderType;
+                var task = (Task) commandBuilderType.InvokeMember(provider.DbMetadata.CommandBuilderDeriveParametersMethod.Name,
+                                                BindingFlags.Static | BindingFlags.Public | BindingFlags.InvokeMethod, null, null,
+                                                new object[] { command });
+
+                await task.ConfigureAwait(false);
+                // var resultProperty = task.GetType().GetProperty("Result");
+
+                if (command.Parameters.Count > 0)
+                {
+                    IDataParameter param = (IDataParameter) command.Parameters[0];
+                    if (param.Direction == ParameterDirection.ReturnValue)
+                    {
+                        if (!includeReturnParameter)
+                        {
+                            command.Parameters.RemoveAt(0);
+                        }
+                    }
+                }
+                return ParameterUtils.CloneParameters(command);
+            }
+        }
+
+        private class AdoRowCallbackCommandCallbackAsync : ICommandCallbackAsync
+        {
+            private AdoTemplate adoTemplate;
+            private IRowCallback rowCallback;
+            private IDictionary returnedParameters;
+
+            public AdoRowCallbackCommandCallbackAsync(AdoTemplate adoTemplate, IRowCallback rowCallback, IDictionary returnedParameters)
+            {
+                this.adoTemplate = adoTemplate;
+                this.rowCallback = rowCallback;
+                this.returnedParameters = returnedParameters;
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                //Extract the single returned result set
+                DbDataReader reader = null;
+                try
+                {
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+                    rowCallback.ProcessRow(reader);
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                }
+                ParameterUtils.ExtractOutputParameters(returnedParameters, command);
+                return null;
+            }
+        }
+        private class AdoResultSetExtractorWithOutputParamsCommandCallbackAsync : ICommandCallbackAsync
+        {
+            private AdoTemplate adoTemplate;
+            private IResultSetExtractor rse;
+            private IDictionary returnedParameters;
+
+            public AdoResultSetExtractorWithOutputParamsCommandCallbackAsync(AdoTemplate adoTemplate, IResultSetExtractor rse, IDictionary returnedParameters)
+            {
+                this.adoTemplate = adoTemplate;
+                this.rse = rse;
+                this.returnedParameters = returnedParameters;
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                object returnVal = null;
+                //Extract the single returned result set
+                DbDataReader reader = null;
+                try
+                {
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+                    returnVal = await rse.ExtractDataAsync(reader).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                }
+                ParameterUtils.ExtractOutputParameters(returnedParameters, command);
+                return returnVal;
+            }
+        }
+
+
+        private class AdoRowMapperQueryCommandCallbackAsync : ICommandCallbackAsync
+        {
+            private AdoTemplate adoTemplate;
+            private IRowMapper rowMapper;
+            //private IDbParameters declaredParameters;
+            private IDictionary returnedParameters;
+
+            public AdoRowMapperQueryCommandCallbackAsync(AdoTemplate adoTemplate, IRowMapper rowMapper, IDictionary returnedParameters)
+            {
+                this.adoTemplate = adoTemplate;
+                this.rowMapper = rowMapper;
+                //this.declaredParameters = declaredParameters;
+                this.returnedParameters = returnedParameters;
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                IList objectList = null;
+                //Extract the single returned result set
+                DbDataReader reader = null;
+                try
+                {
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+                    RowMapperResultSetExtractor rse = new RowMapperResultSetExtractor(rowMapper, 1);
+                    objectList = (IList) await rse.ExtractDataAsync(reader).ConfigureAwait(false);
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                }
+                ParameterUtils.ExtractOutputParameters(returnedParameters, command);
+                return objectList;
+            }
+        }
+
+
+        private class ExecuteNonQueryCallbackWithParametersAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private CommandType commandType;
+            private string commandText;
+            private IDbParameters parameters;
+
+            public ExecuteNonQueryCallbackWithParametersAsync(CommandType commandType, string commandText, IDbParameters dbParameters)
+            {
+                this.commandType = commandType;
+                this.commandText = commandText;
+                parameters = dbParameters;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                command.CommandType = commandType;
+                command.CommandText = commandText;
+                ParameterUtils.CopyParameters(command, parameters);
+                Object returnValue = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                ParameterUtils.CopyParameters(parameters, command);
+                return returnValue;
+            }
+
+        }
+
+
+        private class ExecuteNonQueryCallbackWithCommandSetterAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private CommandType commandType;
+            private string commandText;
+            private ICommandSetter commandSetter;
+
+            public ExecuteNonQueryCallbackWithCommandSetterAsync(CommandType commandType, string commandText, ICommandSetter commandSetter)
+            {
+                this.commandType = commandType;
+                this.commandText = commandText;
+                this.commandSetter = commandSetter;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                command.CommandType = commandType;
+                command.CommandText = commandText;
+                if (commandSetter != null)
+                {
+                    commandSetter.SetValues(command);
+                }
+                object rowsAffected = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                if (LOG.IsDebugEnabled)
+                {
+                    LOG.Debug("ExecuteNonQuery affected " + rowsAffected + " rows");
+                }
+                return rowsAffected;
+            }
+
+        }
+
+
+        private class ExecuteScalarCallbackWithParametersAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private CommandType commandType = CommandType.Text;
+            private string commandText;
+            private IDbParameters parameters;
+
+            public ExecuteScalarCallbackWithParametersAsync(CommandType cmdType, string cmdText, IDbParameters dbParameters)
+            {
+                commandType = cmdType;
+                commandText = cmdText;
+                parameters = dbParameters;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                command.CommandType = commandType;
+                command.CommandText = commandText;
+                ParameterUtils.CopyParameters(command, parameters);
+                object returnValue = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                ParameterUtils.CopyParameters(parameters, command);
+                return returnValue;
+            }
+        }
+
+        private class ExecuteScalarCallbackWithCommandSetterAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private CommandType commandType;
+            private string commandText;
+            private ICommandSetter commandSetter;
+
+            public ExecuteScalarCallbackWithCommandSetterAsync(CommandType commandType, string commandText, ICommandSetter commandSetter)
+            {
+                this.commandType = commandType;
+                this.commandText = commandText;
+                this.commandSetter = commandSetter;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                command.CommandType = commandType;
+                command.CommandText = commandText;
+                if (commandSetter != null)
+                {
+                    commandSetter.SetValues(command);
+                }
+                object returnValue = await command.ExecuteNonQueryAsync().ConfigureAwait(false);
+                if (LOG.IsDebugEnabled)
+                {
+                    LOG.Debug("ExecuteScalar return value = " + returnValue);
+                }
+                return returnValue;
+            }
+
+        }
+
+
+        private class ExecuteCommandCallbackUsingDelegateAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private CommandDelegateAsync del;
+            private string commandText;
+
+            public ExecuteCommandCallbackUsingDelegateAsync(CommandDelegateAsync d)
+            {
+                del = d;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                try
+                {
+                    return await del(command).ConfigureAwait(false);
+                }
+                catch (Exception e)
+                {
+                    e.GetType();
+                    commandText = command.CommandText;
+                    throw;
+                }
+            }
+        }
+
+
+
+        private class QueryCallbackWithCommandSetterAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private AdoTemplate adoTemplate;
+            private IResultSetExtractor rse;
+            private ResultSetExtractorDelegateAsync resultSetExtractorDelegateAsync;
+            private ICommandSetter commandSetter;
+            private CommandType commandType;
+            private string commandText;
+
+            public QueryCallbackWithCommandSetterAsync(AdoTemplate adoTemplate, CommandType cmdType, string cmdText, IResultSetExtractor rse, ICommandSetter commandSetter)
+            {
+                this.adoTemplate = adoTemplate;
+                commandType = cmdType;
+                commandText = cmdText;
+                this.rse = rse;
+                this.commandSetter = commandSetter;
+            }
+
+            public QueryCallbackWithCommandSetterAsync(AdoTemplate adoTemplate, CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegateAsync, ICommandSetter commandSetter)
+            {
+                this.adoTemplate = adoTemplate;
+                commandType = cmdType;
+                commandText = cmdText;
+                this.resultSetExtractorDelegateAsync = resultSetExtractorDelegateAsync;
+                this.commandSetter = commandSetter;
+            }
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                DbDataReader reader = null;
+                try
+                {
+                    command.CommandType = commandType;
+                    command.CommandText = commandText;
+                    if (commandSetter != null)
+                    {
+                        commandSetter.SetValues(command);
+                    }
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+                    if (rse != null)
+                    {
+                        return rse.ExtractDataAsync(reader);
+                    }
+                    else
+                    {
+                        return resultSetExtractorDelegateAsync(reader);
+                    }
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                }
+            }
+
+        }
+
+        private class QueryCallbackAsync : ICommandCallbackAsync, ICommandTextProvider
+        {
+            private AdoTemplate adoTemplate;
+            private IResultSetExtractor rse;
+            private ResultSetExtractorDelegateAsync resultSetExtractorDelegateAsync;
+            private CommandType commandType;
+            private string commandText;
+            private IDbParameters parameters;
+
+            public QueryCallbackAsync(AdoTemplate adoTemplate, CommandType cmdType, string cmdText, IResultSetExtractor rse, IDbParameters dbParameters)
+            {
+                this.adoTemplate = adoTemplate;
+                commandType = cmdType;
+                commandText = cmdText;
+                this.rse = rse;
+                parameters = dbParameters;
+            }
+
+            public QueryCallbackAsync(AdoTemplate adoTemplate, CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegateAsync, IDbParameters dbParameters)
+            {
+                this.adoTemplate = adoTemplate;
+                commandType = cmdType;
+                commandText = cmdText;
+                this.resultSetExtractorDelegateAsync = resultSetExtractorDelegateAsync;
+                parameters = dbParameters;
+            }
+
+
+            public string CommandText
+            {
+                get { return commandText; }
+            }
+
+            public async Task<object> DoInCommandAsync(DbCommand command)
+            {
+                DbDataReader reader = null;
+                try
+                {
+                    command.CommandType = commandType;
+                    command.CommandText = commandText;
+                    ParameterUtils.CopyParameters(command, parameters);
+                    reader = adoTemplate.CreateDataReaderWrapper(await command.ExecuteReaderAsync().ConfigureAwait(false));
+                    object returnValue;
+                    if (rse != null)
+                    {
+                        returnValue = await rse.ExtractDataAsync(reader).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        returnValue = await resultSetExtractorDelegateAsync(reader).ConfigureAwait(false);
+                    }
+                    return returnValue;
+                }
+                finally
+                {
+                    Support.AdoUtils.CloseReader(reader);
+                    ParameterUtils.CopyParameters(parameters, command);
+                }
+            }
+        }
+
         #endregion
 
         /// <summary>
@@ -3035,6 +4354,20 @@ namespace Spring.Data.Core
                 IDataReaderWrapper wrapper = (IDataReaderWrapper) newDataReaderWrapper.Invoke(ObjectUtils.EmptyObjects);
                 wrapper.WrappedReader = readerToWrap;
                 return wrapper;
+            }
+            else
+            {
+                return readerToWrap;
+            }
+        }
+
+        public override DbDataReader CreateDataReaderWrapper(DbDataReader readerToWrap)
+        {
+            if (dataReaderWrapperType != null && newDataReaderWrapper != null)
+            {
+                IDataReaderWrapper wrapper = (IDataReaderWrapper) newDataReaderWrapper.Invoke(ObjectUtils.EmptyObjects);
+                wrapper.WrappedReader = readerToWrap;
+                return (DbDataReader) wrapper;
             }
             else
             {

@@ -65,6 +65,24 @@ namespace Spring.Data.Objects.Generic
             usingDerivedParameters = true;
         }
 
+	    public async Task DeriveParametersAsync()
+	    {
+	        await DeriveParametersAsync(false).ConfigureAwait(false);
+	    }
+
+
+        public async Task DeriveParametersAsync(bool includeReturnParameter)
+        {
+            //TODO does this account for offsets?
+            IDataParameter[] derivedParameters = await AdoTemplate.DeriveParametersAsync(Sql, includeReturnParameter).ConfigureAwait(false);
+            for (int i = 0; i < derivedParameters.Length; i++)
+            {
+                IDataParameter parameter = derivedParameters[i];
+                DeclaredParameters.AddParameter(parameter);
+            }
+            usingDerivedParameters = true;
+        }
+
 	    public void AddResultSetExtractor(string name, IResultSetExtractor resultSetExtractor)
         {
             if (Compiled)
@@ -190,6 +208,87 @@ namespace Spring.Data.Objects.Generic
         {
             ValidateNamedParameters(inParams);
             return AdoTemplate.QueryWithCommandCreator<T,U>(NewCommandCreator(inParams), resultProcessors);
+        }
+
+	    protected virtual async Task<IDictionary> ExecuteScalarAsync(params object[] inParameterValues)
+	    {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+	    }
+
+        protected virtual async Task<IDictionary> ExecuteNonQueryAsync(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+        }
+
+
+        public async Task<IList<T>> QueryWithRowMapperAsync<T>(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            if (resultProcessors.Count == 0)
+            {
+                throw new InvalidDataAccessApiUsageException("No row mapper is specified.");
+            }
+
+            NamedResultSetProcessor<T> resultSetProcessor = resultProcessors[0] as NamedResultSetProcessor<T>;
+            if (resultSetProcessor == null)
+            {
+                throw new InvalidDataAccessApiUsageException("No row mapper is specified.");
+            }
+
+            if (resultSetProcessor.RowMapper == null)
+            {
+                throw new InvalidDataAccessApiUsageException("No row mapper is specified as first result set processor.");
+            }
+            IDictionary outParams = await QueryAsync<T>(inParameterValues).ConfigureAwait(false);
+            return outParams[resultSetProcessor.Name] as IList<T>;
+
+        }
+
+        protected virtual async Task<IDictionary> QueryAsync<T>(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.QueryWithCommandCreatorAsync<T>(NewCommandCreatorWithParamValues(inParameterValues), resultProcessors).ConfigureAwait(false);
+
+        }
+
+        protected virtual async Task<IDictionary> QueryAsync<T, U>(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.QueryWithCommandCreatorAsync<T, U>(NewCommandCreatorWithParamValues(inParameterValues), resultProcessors).ConfigureAwait(false);
+
+        }
+
+	    /// <summary>
+	    /// Execute the stored procedure using 'ExecuteScalar'
+	    /// </summary>
+	    /// <param name="inParams">Value of input parameters.</param>
+        /// <returns>Dictionary with any named output parameters and the value of the
+        /// scalar under the key "scalar".</returns>
+	    protected virtual async Task<IDictionary> ExecuteScalarByNamedParamAsync(IDictionary inParams)
+	    {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+	    }
+
+        protected virtual async Task<IDictionary> ExecuteNonQueryByNamedParamAsync(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+        }
+
+
+        protected virtual async Task<IDictionary> QueryByNamedParamAsync<T>(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.QueryWithCommandCreatorAsync<T>(NewCommandCreator(inParams), resultProcessors).ConfigureAwait(false);
+        }
+
+        protected virtual async Task<IDictionary> QueryByNamedParamAsync<T, U>(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.QueryWithCommandCreatorAsync<T, U>(NewCommandCreator(inParams), resultProcessors).ConfigureAwait(false);
         }
 
 	    protected override bool IsInputParameter(IDataParameter parameter)

@@ -69,6 +69,18 @@ namespace Spring.Data.Objects
             return AdoTemplate.ExecuteScalar(NewCommandCreator(inParams));
         }
 
+        public async Task<IDictionary> ExecuteScalarAsync(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+        }
+
+        public async Task<IDictionary> ExecuteScalarByNamedParamAsync(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+        }
+
         #endregion
     }
 }

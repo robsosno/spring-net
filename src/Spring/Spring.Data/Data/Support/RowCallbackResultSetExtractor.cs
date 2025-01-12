@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 using Spring.Util;
 
 namespace Spring.Data.Support
@@ -76,6 +77,36 @@ namespace Spring.Data.Support
             else
             {
                 while (reader.Read())
+                {
+                    rowCallbackDelegate(reader);
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// All rows of the data reader are passed to the IRowCallback
+        /// associated with this class.
+        /// </summary>
+        /// <param name="reader">The IDataReader to extract data from.
+        /// Implementations should not close this: it will be closed
+        /// by the AdoTemplate.</param>
+        /// <returns>
+        /// Null is returned since IRowCallback manages its own state.
+        /// </returns>
+        public async Task<object> ExtractDataAsync(DbDataReader reader)
+        {
+            if (rowCallback != null)
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    rowCallback.ProcessRow(reader);
+                }
+            }
+            else
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     rowCallbackDelegate(reader);
                 }

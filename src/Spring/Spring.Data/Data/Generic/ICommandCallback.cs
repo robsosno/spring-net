@@ -53,5 +53,6 @@ namespace Spring.Data.Generic
         /// <param name="command">An active IDbCommand instance</param>
         /// <returns>The result object</returns>
         T DoInCommand(DbCommand command);
+        Task<T> DoInCommandAsync(DbCommand command);
 	}
 }

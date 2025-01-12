@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Data.Common;
+
 namespace Spring.Data.Core
 {
     /// <summary>
@@ -91,6 +93,30 @@ namespace Spring.Data.Core
             else
             {
                 while (reader.Read())
+                {
+                    results.Add(rowMapperDelegate(reader, rowNum++));
+                }
+            }
+
+            return results;
+        }
+
+        public async Task<object> ExtractDataAsync(DbDataReader reader)
+        {
+            // Use the more efficient collection if we know how many rows to expect:
+            // ArrayList in case of a known row count, LinkedList if unknown
+            var results = new List<object>(rowsExpected);
+            int rowNum = 0;
+            if (rowMapper != null)
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    results.Add(rowMapper.MapRow(reader, rowNum++));
+                }  
+            }
+            else
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     results.Add(rowMapperDelegate(reader, rowNum++));
                 }

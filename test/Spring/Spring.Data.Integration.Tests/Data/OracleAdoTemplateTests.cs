@@ -25,6 +25,7 @@ using System.Collections;
 using System.Data;
 using System.Data.Common;
 using System.Data.OracleClient;
+using System.Threading.Tasks;
 using Common.Logging;
 using NUnit.Framework;
 using Spring.Context;
@@ -78,6 +79,20 @@ namespace Spring.Data
             {
                 IList testObjects = new ArrayList();
                 while (reader.Read())
+                {
+                    TestObject to = new TestObject();
+                    //object foo = reader.GetDataTypeName(0);
+                    to.ObjectNumber = (int) reader.GetInt64(0);
+                    to.Name = reader.GetString(1);
+                    testObjects.Add(to);
+                }
+                return testObjects;
+            }
+
+            public async Task<object> ExtractDataAsync(DbDataReader reader)
+            {
+                IList testObjects = new ArrayList();
+                while (await reader.ReadAsync())
                 {
                     TestObject to = new TestObject();
                     //object foo = reader.GetDataTypeName(0);

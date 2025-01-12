@@ -68,6 +68,24 @@ namespace Spring.Data.Objects
             usingDerivedParameters = true;
         }
 
+		public async Task DeriveParametersAsync()
+	    {
+	        await DeriveParametersAsync(false).ConfigureAwait(false);
+	    }
+
+
+        public async Task DeriveParametersAsync(bool includeReturnParameter)
+        {
+            //TODO does this account for offsets?
+            IDataParameter[] derivedParameters = await AdoTemplate.DeriveParametersAsync(Sql, includeReturnParameter).ConfigureAwait(false);
+            for (int i = 0; i < derivedParameters.Length; i++)
+            {
+                IDataParameter parameter = derivedParameters[i];
+                DeclaredParameters.AddParameter(parameter);
+            }
+            usingDerivedParameters = true;
+        }
+
 
         public void AddResultSetExtractor(string name, IResultSetExtractor resultSetExtractor)
         {
@@ -115,6 +133,24 @@ namespace Spring.Data.Objects
             return AdoTemplate.QueryWithCommandCreator(NewCommandCreatorWithParamValues(inParameterValues), resultProcessors);
         }
 
+	    protected virtual async Task<IDictionary> ExecuteScalarAsync(params object[] inParameterValues)
+	    {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+	    }
+
+        protected virtual async Task<IDictionary> ExecuteNonQueryAsync(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+        }
+
+        protected virtual async Task<IDictionary> QueryAsync(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.QueryWithCommandCreatorAsync(NewCommandCreatorWithParamValues(inParameterValues), resultProcessors).ConfigureAwait(false);
+        }
+
 	    /// <summary>
 	    /// Execute the stored procedure using 'ExecuteScalar'
 	    /// </summary>
@@ -127,17 +163,34 @@ namespace Spring.Data.Objects
             return AdoTemplate.ExecuteScalar(NewCommandCreator(inParams));
 	    }
 
+	    protected virtual async Task<IDictionary> ExecuteScalarByNamedParamAsync(IDictionary inParams)
+	    {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteScalarAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+	    }
+
         protected virtual IDictionary ExecuteNonQueryByNamedParam(IDictionary inParams)
         {
             ValidateNamedParameters(inParams);
             return AdoTemplate.ExecuteNonQuery(NewCommandCreator(inParams));
         }
 
+        protected virtual async Task<IDictionary> ExecuteNonQueryByNamedParamAsync(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+        }
 
         protected virtual IDictionary QueryByNamedParam(IDictionary inParams)
         {
             ValidateNamedParameters(inParams);
             return AdoTemplate.QueryWithCommandCreator(NewCommandCreator(inParams), resultProcessors);
+        }
+
+        protected virtual async Task<IDictionary> QueryByNamedParamAsync(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.QueryWithCommandCreatorAsync(NewCommandCreator(inParams), resultProcessors).ConfigureAwait(false);
         }
 
         protected override bool IsInputParameter(IDataParameter parameter)

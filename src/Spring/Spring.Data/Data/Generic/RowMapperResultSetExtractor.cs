@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 using Spring.Util;
 
 namespace Spring.Data.Generic
@@ -127,6 +128,38 @@ namespace Spring.Data.Generic
             else
             {
                 while (reader.Read())
+                {
+                    results.Add(rowMapperDelegate(reader, rowNum++));
+                }
+            }
+
+            return results;
+        }
+
+        public async Task<IList<T>> ExtractDataAsync(DbDataReader reader)
+        {
+            // Use the more efficient collection if we know how many rows to expect:
+            // ArrayList in case of a known row count, LinkedList if unknown
+            //IList<T> results = (rowsExpected > 0) ? new List<T>(rowsExpected) : new LinkedList<T>();
+
+            //how come LinkedList<T> doesn't implement IList<T> ?!?!?!
+            //some web entries claim slow indexer...  need to write our own again?  return ICollection instead?
+            //http://blogs.msdn.com/kcwalina/archive/2005/09/23/Collections.aspx
+            //We did not implement IList<T> on LinkedList because the indexer would be
+            //very slow. If you really need the interface, you probably can inherit from
+            //LinkedList<T> and implement the interface on the subtype.
+            IList<T> results =  new List<T>();
+		    int rowNum = 0;
+            if (rowMapper != null)
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
+                {
+                    results.Add(rowMapper.MapRow(reader, rowNum++));
+                }
+            }
+            else
+            {
+                while (await reader.ReadAsync().ConfigureAwait(false))
                 {
                     results.Add(rowMapperDelegate(reader, rowNum++));
                 }

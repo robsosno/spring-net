@@ -133,6 +133,75 @@ namespace Spring.Data.Objects.Generic
             return DataAccessUtils.RequiredUniqueResultSet(results);
         }
 
+        /// <summary>
+        /// Convenient method to execute query without parameters or calling context.
+        /// </summary>
+        /// <typeparam name="T">The type parameter for the returned collection</typeparam>
+        /// <returns>List of mapped objects</returns>
+        public async Task<IList<T>> QueryAsync<T>()
+        {
+            return await QueryByNamedParamAsync<T>(null).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Convenient method to execute query with parameters but without calling context.
+        /// </summary>
+        /// <typeparam name="T">The type parameter for the returned collection</typeparam>
+        /// <param name="inParams">The parameters for the query.</param>
+        /// <returns></returns>
+        public async Task<IList<T>> QueryByNamedParamAsync<T>(System.Collections.IDictionary inParams)
+	    {
+	        return await QueryByNamedParamAsync<T>(inParams, null).ConfigureAwait(false);
+	    }
+
+        /// <summary>
+        /// Convenient method to execute query with parameters and access to output parameter values.
+        /// </summary>
+        /// <typeparam name="T">The type parameter for the returned collection</typeparam>
+        /// <param name="inParams">The parameters for the query.</param>
+        /// <param name="outParams">The returned output parameters.</param>
+        /// <returns></returns>
+        public async Task<IList<T>> QueryByNamedParamAsync<T>(System.Collections.IDictionary inParams,
+                                             System.Collections.IDictionary outParams)
+	    {
+            return await QueryByNamedParamAsync<T>(inParams, outParams, null).ConfigureAwait(false);
+	    }
+
+        /// <summary>
+        /// Central execution method.  All named parameter execution goes through this method.
+        /// </summary>
+        /// <typeparam name="T">the type parameter for the returned collection</typeparam>
+        /// <param name="inParams">The in params.</param>
+        /// <param name="outParams">The out params.</param>
+        /// <param name="callingContext">The calling context.</param>
+        /// <returns></returns>
+        public async Task<IList<T>> QueryByNamedParamAsync<T>(System.Collections.IDictionary inParams,
+                                             System.Collections.IDictionary outParams,
+                                             System.Collections.IDictionary callingContext)
+        {
+            ValidateNamedParameters(inParams);
+            IRowMapper<T> rowMapper = NewRowMapper<T>(inParams, callingContext);
+            return await AdoTemplate.QueryWithCommandCreatorAsync(NewCommandCreator(inParams), rowMapper, outParams).ConfigureAwait(false);
+        }
+
+        public async Task<T> QueryForObjectAsync<T>(System.Collections.IDictionary inParams)
+        {
+            IList<T> results = await QueryByNamedParamAsync<T>(inParams).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        public async Task<T> QueryForObjectAsync<T>(System.Collections.IDictionary inParams, System.Collections.IDictionary returnedParameters)
+        {
+            IList<T> results = await QueryByNamedParamAsync<T>(inParams, returnedParameters).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        public async Task<T> QueryForObjectAsync<T>(System.Collections.IDictionary inParams, System.Collections.IDictionary returnedParameters, System.Collections.IDictionary callingContext)
+        {
+            IList<T> results = await QueryByNamedParamAsync<T>(inParams, returnedParameters, callingContext).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
 
         protected abstract IRowMapper<T> NewRowMapper<T>(System.Collections.IDictionary inParams, System.Collections.IDictionary callingContext);
 

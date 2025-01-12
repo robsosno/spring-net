@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data.Generic
 {
@@ -53,6 +54,7 @@ namespace Spring.Data.Generic
         /// <returns>An arbitrary result object or null if none.  The
         /// extractor will typically be stateful in the latter case.</returns>
         T ExtractData(IDataReader reader);
+        Task<T> ExtractDataAsync(DbDataReader reader);
         
 
     }

@@ -102,6 +102,74 @@ namespace Spring.Data.Generic
         /// <returns>A result object returned by the callback or null</returns>
         T Execute<T>(DataAdapterDelegate<T> del);
 
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a generic interface based callback.
+        /// </summary>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <param name="action">the callback to execute based on DbCommand</param>
+        /// <returns>An object returned from callback</returns>
+        Task<T> ExecuteAsync<T>(ICommandCallback<T> action);
+
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a generic interface based callback.
+        /// </summary>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <param name="action">The callback to execute based on IDbCommand</param>
+        /// <returns>An object returned from callback</returns>
+        Task<T> ExecuteAsync<T>(IDbCommandCallbackAsync<T> action);
+
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a generic delegate callback.
+        /// </summary>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <remarks>This allows for implementing arbitrary data access operations
+        /// on a single command within Spring's managed ADO.NET environment.</remarks>
+        /// <param name="del">The delegate called with a DbCommand object.</param>
+        /// <returns>A result object returned by the action or null</returns>
+        Task<T> ExecuteAsync<T>(CommandDelegateAsync<T> del);
+
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a generic delegate callback.
+        /// </summary>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <remarks>This allows for implementing arbitrary data access operations
+        /// on a single command within Spring's managed ADO.NET environment.</remarks>
+        /// <param name="del">The delegate called with a IDbCommand object.</param>
+        /// <returns>A result object returned by the action or null</returns>
+        Task<T> ExecuteAsync<T>(IDbCommandDelegateAsync<T> del);
+
+        /// <summary>
+        /// Executes ADO.NET operations on a command object, created by the provided IDbCommandCreator,
+        /// using the interface based callback IDbCommandCallbackAsync.
+        /// </summary>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <param name="commandCreator">The command creator.</param>
+        /// <param name="action">The callback to execute based on IDbCommand</param>
+        /// <returns>A result object returned by the action or null</returns>
+        Task<T> ExecuteAsync<T>(IDbCommandCreator commandCreator, IDbCommandCallbackAsync<T> action);
+
+        /// <summary>
+        /// Execute ADO.NET operations on a IDbDataAdapter object using an interface based callback.
+        /// </summary>
+        /// <remarks>This allows for implementing abritrary data access operations
+        /// on a single DataAdapter within Spring's managed ADO.NET environment.
+        /// </remarks>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <param name="dataAdapterCallback">The data adapter callback.</param>
+        /// <returns>A result object returned by the callback or null</returns>
+        Task<T> ExecuteAsync<T>(IDataAdapterCallback<T> dataAdapterCallback);
+
+        /// <summary>
+        /// Execute ADO.NET operations on a IDbDataAdapter object using an delgate based callback.
+        /// </summary>
+        /// <remarks>This allows for implementing abritrary data access operations
+        /// on a single DataAdapter within Spring's managed ADO.NET environment.
+        /// </remarks>
+        /// <typeparam name="T">The type of object returned from the callback.</typeparam>
+        /// <param name="del">The delegate called with a IDbDataAdapter object.</param>
+        /// <returns>A result object returned by the callback or null</returns>
+        Task<T> ExecuteAsync<T>(DataAdapterDelegateAsync<T> del);
+
         #endregion
 
         #region Queries with RowMapper<T>
@@ -115,6 +183,17 @@ namespace Spring.Data.Generic
                                        string parameterName, Enum dbType, int size, object parameterValue);
 
         IList<T> QueryWithRowMapper<T>(CommandType cmdType, string cmdText, IRowMapper<T> rowMapper,
+                                       IDbParameters parameters);
+
+        Task<IList<T>> QueryWithRowMapperAsync<T>(CommandType cmdType, string cmdText, IRowMapper<T> rowMapper);
+
+        Task<IList<T>> QueryWithRowMapperAsync<T>(CommandType cmdType, string cmdText, IRowMapper<T> rowMapper,
+                                       ICommandSetter commandSetter);
+
+        Task<IList<T>> QueryWithRowMapperAsync<T>(CommandType cmdType, string cmdText, IRowMapper<T> rowMapper,
+                                       string parameterName, Enum dbType, int size, object parameterValue);
+
+        Task<IList<T>> QueryWithRowMapperAsync<T>(CommandType cmdType, string cmdText, IRowMapper<T> rowMapper,
                                        IDbParameters parameters);
 
 
@@ -132,6 +211,18 @@ namespace Spring.Data.Generic
                                                string parameterName, Enum dbType, int size, object parameterValue);
 
         IList<T> QueryWithRowMapperDelegate<T>(CommandType cmdType, string cmdText, RowMapperDelegate<T> rowMapperDelegate,
+                                               IDbParameters parameters);
+
+        Task<IList<T>> QueryWithRowMapperDelegateAsync<T>(CommandType cmdType, string cmdText, RowMapperDelegate<T> rowMapperDelegate);
+
+        Task<IList<T>> QueryWithRowMapperDelegateAsync<T>(CommandType cmdType, string cmdText, RowMapperDelegate<T> rowMapperDelegate,
+                                               ICommandSetter commandSetter);
+
+
+        Task<IList<T>> QueryWithRowMapperDelegateAsync<T>(CommandType cmdType, string cmdText, RowMapperDelegate<T> rowMapperDelegate,
+                                               string parameterName, Enum dbType, int size, object parameterValue);
+
+        Task<IList<T>> QueryWithRowMapperDelegateAsync<T>(CommandType cmdType, string cmdText, RowMapperDelegate<T> rowMapperDelegate,
                                                IDbParameters parameters);
 
 
@@ -152,6 +243,20 @@ namespace Spring.Data.Generic
 
         T QueryWithResultSetExtractor<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor,
                                          CommandSetterDelegate commandSetterDelegate);
+
+        Task<T> QueryWithResultSetExtractorAsync<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor);
+
+        Task<T> QueryWithResultSetExtractorAsync<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor,
+                                         string name, Enum dbType, int size, object parameterValue);
+
+        Task<T> QueryWithResultSetExtractorAsync<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor,
+                                         IDbParameters parameters);
+
+        Task<T> QueryWithResultSetExtractorAsync<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor,
+                                         ICommandSetter commandSetter);
+
+        Task<T> QueryWithResultSetExtractorAsync<T>(CommandType cmdType, string cmdText, IResultSetExtractor<T> resultSetExtractor,
+                                         CommandSetterDelegate commandSetterDelegate);
         #endregion
 
 
@@ -170,6 +275,19 @@ namespace Spring.Data.Generic
 
         T QueryWithResultSetExtractorDelegate<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegate<T> resultSetExtractor,
                                                  CommandSetterDelegate commandSetterDelegate);
+        Task<T> QueryWithResultSetExtractorDelegateAsync<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync<T> resultSetExtractor);
+
+        Task<T> QueryWithResultSetExtractorDelegateAsync<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync<T> resultSetExtractor,
+                                                 string paramenterName, Enum dbType, int size, object parameterValue);
+
+        Task<T> QueryWithResultSetExtractorDelegateAsync<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync<T> resultSetExtractor,
+                                                 IDbParameters parameters);
+
+        Task<T> QueryWithResultSetExtractorDelegateAsync<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync<T> resultSetExtractor,
+                                                 ICommandSetter commandSetter);
+
+        Task<T> QueryWithResultSetExtractorDelegateAsync<T>(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync<T> resultSetExtractor,
+                                                 CommandSetterDelegate commandSetterDelegate);
         #endregion
 
         #region Queries for Object<T>
@@ -184,6 +302,19 @@ namespace Spring.Data.Generic
 
 
         T QueryForObject<T>(CommandType cmdType, string sql, IRowMapper<T> rowMapper,
+                            string name, Enum dbType, int size, object parameterValue);
+
+
+        Task<T> QueryForObjectAsync<T>(CommandType cmdType, string sql, IRowMapper<T> rowMapper);
+
+
+        Task<T> QueryForObjectAsync<T>(CommandType cmdType, string sql, IRowMapper<T> rowMapper, ICommandSetter commandSetter);
+
+
+        Task<T> QueryForObjectAsync<T>(CommandType cmdType, string sql, IRowMapper<T> rowMapper, IDbParameters parameters);
+
+
+        Task<T> QueryForObjectAsync<T>(CommandType cmdType, string sql, IRowMapper<T> rowMapper,
                             string name, Enum dbType, int size, object parameterValue);
 
 
@@ -202,6 +333,19 @@ namespace Spring.Data.Generic
 
 
         T QueryForObjectDelegate<T>(CommandType cmdType, string sql, RowMapperDelegate<T> rowMapper,
+                                    string name, Enum dbType, int size, object parameterValue);
+
+
+        Task<T> QueryForObjectDelegateAsync<T>(CommandType cmdType, string sql, RowMapperDelegate<T> rowMapper);
+
+
+        Task<T> QueryForObjectDelegateAsync<T>(CommandType cmdType, string sql, RowMapperDelegate<T> rowMapper, ICommandSetter commandSetter);
+
+
+        Task<T> QueryForObjectDelegateAsync<T>(CommandType cmdType, string sql, RowMapperDelegate<T> rowMapper, IDbParameters parameters);
+
+
+        Task<T> QueryForObjectDelegateAsync<T>(CommandType cmdType, string sql, RowMapperDelegate<T> rowMapper,
                                     string name, Enum dbType, int size, object parameterValue);
 
 
@@ -224,6 +368,20 @@ namespace Spring.Data.Generic
 
         IDictionary QueryWithCommandCreator<T, U>(IDbCommandCreator cc, IList namedResultSetProcessors);
 
+        Task<T> QueryWithCommandCreatorAsync<T>(IDbCommandCreator cc, IResultSetExtractor<T> rse);
+
+        Task<IList<T>> QueryWithCommandCreatorAsync<T>(IDbCommandCreator cc, IRowMapper<T> rowMapper);
+
+        Task<T> QueryWithCommandCreatorAsync<T>(IDbCommandCreator cc, IResultSetExtractor<T> rse, IDictionary returnedParameters);
+
+        Task<IList<T>> QueryWithCommandCreatorAsync<T>(IDbCommandCreator cc, IRowMapper<T> rowMapper,
+                                            IDictionary returnedParameters);
+
+
+        Task<IDictionary> QueryWithCommandCreatorAsync<T>(IDbCommandCreator cc, IList namedResultSetProcessors);
+
+        Task<IDictionary> QueryWithCommandCreatorAsync<T, U>(IDbCommandCreator cc, IList namedResultSetProcessors);
+
         #endregion
 
         #region Parameter Creation Helper Methods
@@ -239,6 +397,10 @@ namespace Spring.Data.Generic
         IDataParameter[] DeriveParameters(string procedureName);
 
         IDataParameter[] DeriveParameters(string procedureName, bool includeReturnParameter);
+
+        Task<IDataParameter[]> DeriveParametersAsync(string procedureName);
+
+        Task<IDataParameter[]> DeriveParametersAsync(string procedureName, bool includeReturnParameter);
 
         #endregion
 

@@ -20,6 +20,7 @@
 
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data
 {
@@ -54,6 +55,7 @@ namespace Spring.Data
         /// <returns>An arbitrary result object or null if none.  The
         /// extractor will typically be stateful in the latter case.</returns>
         object ExtractData(IDataReader reader);
+        Task<object> ExtractDataAsync(DbDataReader reader);
         
 
     }

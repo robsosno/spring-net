@@ -24,6 +24,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Data.SqlClient;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using Spring.Context;
 using Spring.Context.Support;
@@ -134,6 +135,20 @@ namespace Spring.Data.Generic
         {
             T testObjectList = new T();
             while(reader.Read())
+            {
+                TestObject to = new TestObject();
+                to.ObjectNumber = reader.GetInt32(0);
+                to.Age = reader.GetInt32(1);
+                to.Name = reader.GetString(2);
+                testObjectList.Add(to);
+            }
+            return testObjectList;
+        }
+
+        public async Task<T> ExtractDataAsync(DbDataReader reader)
+        {
+            T testObjectList = new T();
+            while (await reader.ReadAsync())
             {
                 TestObject to = new TestObject();
                 to.ObjectNumber = reader.GetInt32(0);

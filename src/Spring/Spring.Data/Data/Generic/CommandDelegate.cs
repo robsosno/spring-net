@@ -43,4 +43,5 @@ namespace Spring.Data.Generic
     /// provided DbCommand </returns>
     /// <author>Mark Pollack</author>
     public delegate T CommandDelegate<T>(DbCommand command);
+    public delegate Task<T> CommandDelegateAsync<T>(DbCommand command);
 }

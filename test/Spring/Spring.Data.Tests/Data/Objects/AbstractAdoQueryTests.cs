@@ -19,7 +19,7 @@
 #endregion
 
 using System.Data;
-
+using System.Data.Common;
 using FakeItEasy;
 
 using Spring.Data.Common;
@@ -37,7 +37,8 @@ namespace Spring.Data.Objects
         public void SetUpMocks()
         {
             provider = A.Fake<IDbProvider>();
-            IDbConnection connection = A.Fake<IDbConnection>();
+            // IDbConnection connection = A.Fake<IDbConnection>();
+            IDbConnection connection = A.Fake<DbConnection>(builder => builder.Implements(typeof(IDbConnection)));
 
             A.CallTo(() => provider.CreateConnection()).Returns(connection).Once();
 
@@ -45,12 +46,13 @@ namespace Spring.Data.Objects
             // will call new DbParameters(IDbProvider), which is a real pain to mock.
             // to store the declared parameters.
 
-            command = A.Fake<IDbCommand>();
+            // command = A.Fake<IDbCommand>();
+            command = A.Fake<DbCommand>(builder => builder.Implements(typeof(IDbCommand)));
             //This IDbCommand is used as a container for the underlying parameter collection.	
             A.CallTo(() => provider.CreateCommand()).Returns(command).Once();
 
             //Create a real instance of IDbParameters to stored the declared parameters
-            IDbProvider realDbProvider = DbProviderFactory.GetDbProvider("System.Data.SqlClient");
+            IDbProvider realDbProvider = Common.DbProviderFactory.GetDbProvider("System.Data.SqlClient");
             IDbParameters dbParameters = new DbParameters(realDbProvider);
 
             //Pass real instance into mock instance.

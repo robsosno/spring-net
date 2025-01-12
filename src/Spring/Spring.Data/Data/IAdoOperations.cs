@@ -20,6 +20,8 @@
 
 using System.Collections;
 using System.Data;
+using System.Threading.Tasks;
+using Spring.Data;
 using Spring.Data.Common;
 
 namespace Spring.Data
@@ -67,6 +69,31 @@ namespace Spring.Data
         /// <returns>A result object returned by the callback or null</returns>
 	    object Execute(IDataAdapterCallback dataAdapterCallback);
 
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using a delegate callback.
+        /// </summary>
+        /// <remarks>This allows for implementing arbitrary data access operations
+        /// on a single command within Spring's managed ADO.NET environment.</remarks>
+        /// <param name="del">The delegate called with a command object.</param>
+        /// <returns>A result object returned by the action or null</returns>
+        Task<object> ExecuteAsync(CommandDelegateAsync del);
+
+        /// <summary>
+        /// Execute a ADO.NET operation on a command object using an interface based callback.
+        /// </summary>
+        /// <param name="action">the callback to execute</param>
+        /// <returns>object returned from callback</returns>
+        Task<object> ExecuteAsync(ICommandCallbackAsync action);
+
+        /// <summary>
+        /// Executes ADO.NET operations on a command object, created by the provided IDbCommandCreator,
+        /// using the interface based callback IDbCommandCallback.
+        /// </summary>
+        /// <param name="commandCreator">The command creator.</param>
+        /// <param name="action">The callback to execute based on IDbCommand</param>
+        /// <returns>A result object returned by the action or null</returns>
+        Task<object> ExecuteAsync(IDbCommandCreator commandCreator, ICommandCallbackAsync action);
+
         #endregion
 
         #region Queries With ResultSetExtractor
@@ -85,6 +112,19 @@ namespace Spring.Data
         /// If there is any problem executing the query.
         /// </exception>
         object QueryWithResultSetExtractor(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor);
+
+        /// <summary>
+        /// Execute a query given IDbCommand's type and text, processing a
+        /// single result set with an instance of IResultSetExtractor
+        /// </summary>
+        /// <param name="cmdType">The type of command</param>
+        /// <param name="cmdText">The text of the query.</param>
+        /// <param name="resultSetExtractor">Object that will extract all rows of a result set</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor);
 
 
 	    // Parameterized Queries
@@ -142,6 +182,57 @@ namespace Spring.Data
         object QueryWithResultSetExtractor(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
                                            IDbParameters parameters);
 
+        /// <summary>
+        /// Execute a query given the CommandType and text with parameters set
+        /// via the command setter, processing a
+        /// single result set with an instance of IResultSetExtractor
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractor">The result set extractor.</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
+                                           ICommandSetter commandSetter);
+
+        /// <summary>
+        /// Execute a query given the CommandType and text specifying a single parameter and process a single result set with an
+        /// instance of IResultSetExtractor.
+        /// </summary>
+        /// <remarks>Convention is to use 0 For the size if it does not make sense for the given data type
+        /// </remarks>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractor">The result set extractor.</param>
+        /// <param name="parameterName">The name of the parameters</param>
+        /// <param name="dbType">The enumeration of the parameter type </param>
+        /// <param name="size">The size of the parmeter - e.g. string length. Use 0 if not relevant for specific data type</param>
+        /// <param name="parameterValue">The value of the parameters</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
+                                           string parameterName, Enum dbType, int size, object parameterValue);
+
+        /// <summary>
+        /// Execute a query given the CommandType and text specifying a collection of parameters and process a single result set with an
+        /// instance of IResultSetExtractor.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractor">The result set extractor.</param>
+        /// <param name="parameters">The query parameters</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorAsync(CommandType cmdType, string cmdText, IResultSetExtractor resultSetExtractor,
+                                           IDbParameters parameters);
+
 
         #endregion
 
@@ -161,6 +252,19 @@ namespace Spring.Data
         /// If there is any problem executing the query.
         /// </exception>
         object QueryWithResultSetExtractorDelegate(CommandType cmdType, string cmdText, ResultSetExtractorDelegate resultSetExtractorDelegate);
+
+        /// <summary>
+        /// Execute a query given static SQL/Stored Procedure name
+        /// and process a single result set with an instance of ResultSetExtractorDelegate
+        /// </summary>
+        /// <param name="cmdType">The type of command.</param>
+        /// <param name="cmdText">The command text.</param>
+        /// <param name="resultSetExtractorDelegate">Delegate that will process all rows of a result set</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate);
 
 
         // Parameterized Queries
@@ -218,6 +322,58 @@ namespace Spring.Data
         object QueryWithResultSetExtractorDelegate(CommandType cmdType, string cmdText, ResultSetExtractorDelegate resultSetExtractorDelegate,
                                                    IDbParameters parameters);
 
+        /// <summary>
+        /// Execute a query given the CommandType and text with parameters set
+        /// via the command setter, processing a
+        /// single result set with an instance of IResultSetExtractor
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractorDelegate">Delegate that will process all rows of a result set</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                   ICommandSetter commandSetter);
+
+
+        /// <summary>
+        /// Execute a query given the CommandType and text specifying a single parameter and process a single result set with an
+        /// instance of IResultSetExtractor.
+        /// </summary>
+        /// <remarks>Convention is to use 0 For the size if it does not make sense for the given data type
+        /// </remarks>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractorDelegate">Delegate that will process all rows of a result set</param>
+        /// <param name="parameterName">The name of the parameters</param>
+        /// <param name="dbType">The enumeration of the parameter type </param>
+        /// <param name="size">The size of the parmeter - e.g. string length. Use 0 if not relevant for specific data type</param>
+        /// <param name="parameterValue">The value of the parameters</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                   string parameterName, Enum dbType, int size, object parameterValue);
+
+        /// <summary>
+        /// Execute a query given the CommandType and text specifying a collection of parameters and process a single result set with an
+        /// instance of IResultSetExtractor.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="resultSetExtractorDelegate">Delegate that will process all rows of a result set</param>
+        /// <param name="parameters">The query parameters</param>
+        /// <returns>An arbitrary result object, as returned by the IResultSetExtractor</returns>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryWithResultSetExtractorDelegateAsync(CommandType cmdType, string cmdText, ResultSetExtractorDelegateAsync resultSetExtractorDelegate,
+                                                   IDbParameters parameters);
+
 
         #endregion
 
@@ -240,6 +396,14 @@ namespace Spring.Data
 
         IList QueryWithRowMapperDelegate(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate, IDbParameters parameter);
 
+        Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate);
+
+        Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate, ICommandSetter commandSetter);
+
+        Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate,
+                                         string parameterName, Enum dbType, int size, object parameterValue);
+
+        Task<IList> QueryWithRowMapperDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate, IDbParameters parameter);
 
         #endregion
 
@@ -257,6 +421,7 @@ namespace Spring.Data
         /// <param name="rowMapper">object that will map one object per row</param>
         /// <returns>the result list containing mapped objects</returns>
         IList QueryWithRowMapper(CommandType cmdType, string cmdText, IRowMapper rowMapper);
+        Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper);
 
 	    // Parameterized Queries
 
@@ -267,6 +432,13 @@ namespace Spring.Data
                     string name, Enum dbType, int size, object parameterValue);
 
         IList QueryWithRowMapper(CommandType cmdType, string cmdText, IRowMapper rowMapper, IDbParameters parameter);
+
+        Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, ICommandSetter commandSetter);
+
+        Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper,
+                    string name, Enum dbType, int size, object parameterValue);
+
+        Task<IList> QueryWithRowMapperAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, IDbParameters parameter);
 
 
 
@@ -350,6 +522,78 @@ namespace Spring.Data
         object QueryForObject(CommandType cmdType, string cmdText, IRowMapper rowMapper,
                               string parameterName, Enum dbType, int size, object parameterValue);
 
+        /// <summary>
+        /// Execute a query with the specified command text, mapping a single result
+        /// row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+	    Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper);
+
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters set via the
+        /// command setter, mapping a single result row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, ICommandSetter commandSetter);
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="parameters">The parameter collection to use in the query.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper, IDbParameters parameters);
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameter, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapper">object that will map one object per row</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectAsync(CommandType cmdType, string cmdText, IRowMapper rowMapper,
+                              string parameterName, Enum dbType, int size, object parameterValue);
+
 
         #endregion
 
@@ -425,6 +669,76 @@ namespace Spring.Data
                                       string parameterName, Enum dbType, int size, object parameterValue);
 
 
+        /// <summary>
+        /// Execute a query with the specified command text, mapping a single result
+        /// row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelgate">delegate that will map one object per row</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelgate);
+
+
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters set via the
+        /// command setter, mapping a single result row to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="commandSetter">The command setter.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, ICommandSetter commandSetter);
+
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameters, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="parameters">The parameter collection to use in the query.</param>
+        /// <returns>The single mapped object.</returns>
+        /// <exception cref="Spring.Dao.IncorrectResultSizeDataAccessException">
+        /// If the query does not return exactly one row.
+        /// </exception>
+        /// <exception cref="Spring.Dao.DataAccessException">
+        /// If there is any problem executing the query.
+        /// </exception>
+        Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate, IDbParameters parameters);
+
+
+        /// <summary>
+        /// Execute a query with the specified command text and parameter, mapping a single result row
+        /// to an object via a RowMapper.
+        /// </summary>
+        /// <param name="cmdType">The command type.</param>
+        /// <param name="cmdText">The command text to execute.</param>
+        /// <param name="rowMapperDelegate">delegate that will map one object per row</param>
+        /// <param name="parameterName">The name of the parameter to map.</param>
+        /// <param name="dbType">One of the database parameter type enumerations.</param>
+        /// <param name="size">The length of the parameter. 0 if not applicable to parameter type.</param>
+        /// <param name="parameterValue">The parameter value.</param>
+        /// <returns></returns>
+        Task<object> QueryForObjectDelegateAsync(CommandType cmdType, string cmdText, RowMapperDelegate rowMapperDelegate,
+                                      string parameterName, Enum dbType, int size, object parameterValue);
+
+
         #endregion
 
         #region Query With CommandCreator
@@ -434,17 +748,26 @@ namespace Spring.Data
 
 	    IList QueryWithCommandCreator(IDbCommandCreator cc, IRowMapper rowMapper);
 
+        Task<object> QueryWithCommandCreatorAsync(IDbCommandCreator commandCreator, IResultSetExtractor resultSetExtractor);
+
+	    Task<IList> QueryWithCommandCreatorAsync(IDbCommandCreator cc, IRowMapper rowMapper);
+
         // Using IResultSetExtractor to return one result set, multiple output parameters.
         object QueryWithCommandCreator(IDbCommandCreator commandCreator, IResultSetExtractor resultSetExtractor, IDictionary returnedParameters);
 
+        Task<object> QueryWithCommandCreatorAsync(IDbCommandCreator commandCreator, IResultSetExtractor resultSetExtractor, IDictionary returnedParameters);
+
         // Using IRowMapper to return one result set, multiple output parameters.
         IList QueryWithCommandCreator(IDbCommandCreator commandCreator, IRowMapper rowMapper, IDictionary returnedParameters);
+
+        Task<IList> QueryWithCommandCreatorAsync(IDbCommandCreator commandCreator, IRowMapper rowMapper, IDictionary returnedParameters);
 
 
 	    // Multiple return result sets, (A list of lists)
 	    // each with either a IRowMapper, IResultSetExtractor, IRowCallback
 	    // and multiple output parameters.
 	    IDictionary QueryWithCommandCreator(IDbCommandCreator commandCreator, IList resultProcessors);
+	    Task<IDictionary> QueryWithCommandCreatorAsync(IDbCommandCreator commandCreator, IList resultProcessors);
 
         #endregion
 
@@ -758,6 +1081,10 @@ namespace Spring.Data
 	    IDataParameter[] DeriveParameters(string procedureName);
 
 	    IDataParameter[] DeriveParameters(string procedureName, bool includeReturnParameter);
+
+	    Task<IDataParameter[]> DeriveParametersAsync(string procedureName);
+
+	    Task<IDataParameter[]> DeriveParametersAsync(string procedureName, bool includeReturnParameter);
 
         #endregion
 

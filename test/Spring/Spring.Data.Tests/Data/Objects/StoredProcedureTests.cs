@@ -40,7 +40,7 @@
 
 using System.Data;
 using System.Data.SqlClient;
-
+using System.Threading.Tasks;
 using FakeItEasy;
 
 using NUnit.Framework;
@@ -78,6 +78,23 @@ namespace Spring.Data.Objects
             NullArg na = new NullArg(provider);
             na.Execute(null);
         }
+
+        [Test]
+        public async Task NullArgAsync()
+        {
+            SqlParameter sqlParameter1 = new SqlParameter();
+            A.CallTo(() => command.CreateParameter()).Returns(sqlParameter1);
+            A.CallTo(() => provider.CreateParameterNameForCollection("ptest")).Returns("@ptest");
+
+            //Create a real instance of IDbParameters to store the executable parameters
+            //IDbProvider realDbProvider = DbProviderFactory.GetDbProvider("System.Data.SqlClient");
+            //IDbParameters dbParameters = new DbParameters(realDbProvider);
+            //provide the same instance to another call to extract output params
+            A.CallTo(() => command.Parameters).ReturnsLazily(() => new SqlCommand().Parameters).Twice();
+
+            NullArgAsync na = new NullArgAsync(provider);
+            await na.ExecuteAsync(null);
+        }
     }
 
     internal class NullArg : StoredProcedure
@@ -92,6 +109,21 @@ namespace Spring.Data.Objects
         public void Execute(string s)
         {
             ExecuteNonQuery(s);
+        }
+    }
+
+    internal class NullArgAsync : StoredProcedure
+    {
+        public NullArgAsync(IDbProvider provider)
+            : base(provider, "takes_null")
+        {
+            DeclaredParameters.Add("ptest", DbType.String);
+            Compile();
+        }
+
+        public async Task ExecuteAsync(string s)
+        {
+            await ExecuteNonQueryAsync(s);
         }
     }
 }

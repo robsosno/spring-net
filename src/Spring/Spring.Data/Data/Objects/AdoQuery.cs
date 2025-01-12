@@ -98,6 +98,46 @@ namespace Spring.Data.Objects
             return DataAccessUtils.RequiredUniqueResultSet(results);
         }
 
+        public async Task<IList> QueryAsync()
+        {
+            return await QueryByNamedParamAsync(null).ConfigureAwait(false);
+        }
+
+	    public async Task<IList> QueryByNamedParamAsync(IDictionary inParams)
+	    {
+	        return await QueryByNamedParamAsync(inParams, null).ConfigureAwait(false);
+	    }
+
+	    public async Task<IList> QueryByNamedParamAsync(IDictionary inParams, IDictionary returnedParameters)
+	    {
+            return await QueryByNamedParamAsync(inParams, returnedParameters, null).ConfigureAwait(false);
+	    }
+
+        public async Task<IList> QueryByNamedParamAsync(IDictionary inParams, IDictionary returnedParameters, IDictionary callingContext)
+        {
+            ValidateNamedParameters(inParams);
+            IRowMapper rowMapper = NewRowMapper(inParams, callingContext);
+            return await AdoTemplate.QueryWithCommandCreatorAsync(NewCommandCreator(inParams), rowMapper, returnedParameters).ConfigureAwait(false);
+        }
+
+        public async Task<object> QueryForObjectAsync(IDictionary inParams)
+        {
+            IList results = await QueryByNamedParamAsync(inParams).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        public async Task<object> QueryForObjectAsync(IDictionary inParams, IDictionary returnedParameters)
+        {
+            IList results = await QueryByNamedParamAsync(inParams, returnedParameters).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
+        public async Task<object> QueryForObjectAsync(IDictionary inParams, IDictionary returnedParameters, IDictionary callingContext)
+        {
+            IList results = await QueryByNamedParamAsync(inParams, returnedParameters, callingContext).ConfigureAwait(false);
+            return DataAccessUtils.RequiredUniqueResultSet(results);
+        }
+
 
 	    protected abstract IRowMapper NewRowMapper(IDictionary inParams, IDictionary callingContext);
 

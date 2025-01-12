@@ -54,5 +54,6 @@ namespace Spring.Data.Generic
         /// <param name="dataAdapter">An active IDbDataAdapter instance</param>
         /// <returns>The result object</returns>
         T DoInDataAdapter(IDbDataAdapter dataAdapter);
+        Task<T> DoInDataAdapterAsync(IDbDataAdapter dataAdapter);
     }
 }

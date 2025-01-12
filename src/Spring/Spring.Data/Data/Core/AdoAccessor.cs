@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 using Spring.Data.Common;
 using Spring.Data.Support;
 using Spring.Objects.Factory;
@@ -196,6 +197,13 @@ namespace Spring.Data.Core
         public abstract IDataReader CreateDataReaderWrapper(IDataReader readerToWrap);
 
         /// <summary>
+        /// Creates the data reader wrapper for use in AdoTemplate callback methods.
+        /// </summary>
+        /// <param name="readerToWrap">The reader to wrap.</param>
+        /// <returns>The data reader used in AdoTemplate callbacks</returns>
+        public abstract DbDataReader CreateDataReaderWrapper(DbDataReader readerToWrap);
+
+        /// <summary>
         /// Creates the a db parameters collection, adding to the collection a parameter created from
         /// the method parameters.
         /// </summary>
@@ -242,6 +250,24 @@ namespace Spring.Data.Core
         /// <param name="includeReturnParameter">if set to <c>true</c> to include return parameter.</param>
         /// <returns>The stored procedure parameters</returns>
         public abstract IDataParameter[] DeriveParameters(string procedureName, bool includeReturnParameter);
+
+        /// <summary>
+        /// Derives the parameters of a stored procedure, not including the return parameter.
+        /// </summary>
+        /// <param name="procedureName">Name of the procedure.</param>
+        /// <returns>The stored procedure parameters.</returns>
+        public virtual async Task<IDataParameter[]> DeriveParametersAsync(string procedureName)
+        {
+            return await DeriveParametersAsync(procedureName, false).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Derives the parameters of a stored procedure including the return parameter
+        /// </summary>
+        /// <param name="procedureName">Name of the procedure.</param>
+        /// <param name="includeReturnParameter">if set to <c>true</c> to include return parameter.</param>
+        /// <returns>The stored procedure parameters</returns>
+        public abstract Task<IDataParameter[]> DeriveParametersAsync(string procedureName, bool includeReturnParameter);
 
         #endregion
     }

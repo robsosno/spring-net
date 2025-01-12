@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data.Generic
 {
@@ -33,4 +34,5 @@ namespace Spring.Data.Generic
     /// by the AdoTemplate.</param>
     /// <returns>An arbitrary result object or null if none.</returns>
     public delegate T ResultSetExtractorDelegate<T>(IDataReader reader);
+    public delegate Task<T> ResultSetExtractorDelegateAsync<T>(DbDataReader reader);
 }

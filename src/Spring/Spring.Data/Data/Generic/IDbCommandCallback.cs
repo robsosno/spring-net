@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data.Generic
 {
@@ -58,5 +59,19 @@ namespace Spring.Data.Generic
         /// <param name="command">An active IDbCommand instance</param>
         /// <returns>The result object</returns>
         T DoInCommand(IDbCommand command);
+    }
+
+    public interface IDbCommandCallbackAsync<T>
+    {
+        /// <summary>
+        /// Called by AdoTemplate.Execute with an active ADO.NET IDbCommand.
+        /// The calling code does not need to care about closing the 
+        /// command or the connection, or
+        /// about handling transactions:  this will all be handled by 
+        /// Spring's AdoTemplate
+        /// </summary>
+        /// <param name="command">An active IDbCommand instance</param>
+        /// <returns>The result object</returns>
+        Task<T> DoInCommandAsync(DbCommand command);
     }
 }

@@ -19,6 +19,7 @@
 #endregion
 
 using System.Data;
+using System.Data.Common;
 
 namespace Spring.Data
 {
@@ -39,4 +40,5 @@ namespace Spring.Data
     /// </remarks>
     /// <author>Mark Pollack</author>
     public delegate object CommandDelegate(IDbCommand command);
+    public delegate Task<object> CommandDelegateAsync(DbCommand command);
 }

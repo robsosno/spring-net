@@ -24,6 +24,7 @@ using System;
 using System.Collections;
 using System.Data;
 using System.Data.Common;
+using System.Threading.Tasks;
 using Common.Logging;
 using NUnit.Framework;
 using Spring.Context;
@@ -358,6 +359,20 @@ namespace Spring.Data
                     to.Name = reader.GetString(2);
                     testObjects.Add(to);
                 }	                
+                return testObjects;
+            }
+
+            public async Task<object> ExtractDataAsync(DbDataReader reader)
+            {
+                IList testObjects = new ArrayList();
+                while (await reader.ReadAsync())
+                {
+                    TestObject to = new TestObject();
+                    to.ObjectNumber = reader.GetInt32(0);
+                    to.Age = reader.GetInt32(1);
+                    to.Name = reader.GetString(2);
+                    testObjects.Add(to);
+                }
                 return testObjects;
             }
         }

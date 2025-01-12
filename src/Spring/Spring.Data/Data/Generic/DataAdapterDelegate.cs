@@ -32,5 +32,6 @@ namespace Spring.Data.Generic
     /// <param name="dataAdapter">An active IDbDataAdapter instance</param>
     /// <returns>The result object</returns>
     public delegate T DataAdapterDelegate<T>(IDbDataAdapter dataAdapter);
+    public delegate Task<T> DataAdapterDelegateAsync<T>(IDbDataAdapter dataAdapter);
    
 }

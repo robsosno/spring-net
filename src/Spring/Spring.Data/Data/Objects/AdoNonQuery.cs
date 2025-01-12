@@ -74,6 +74,19 @@ namespace Spring.Data.Objects
             return AdoTemplate.ExecuteNonQuery(NewCommandCreator(inParams));
         }
 
+        public async Task<IDictionary> ExecuteNonQueryAsync(params object[] inParameterValues)
+        {
+            ValidateParameters(inParameterValues);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreatorWithParamValues(inParameterValues)).ConfigureAwait(false);
+        }
+
+
+        public async Task<IDictionary> ExecuteNonQueryByNamedParamAsync(IDictionary inParams)
+        {
+            ValidateNamedParameters(inParams);
+            return await AdoTemplate.ExecuteNonQueryAsync(NewCommandCreator(inParams)).ConfigureAwait(false);
+        }
+
 		#endregion
 	}
 }

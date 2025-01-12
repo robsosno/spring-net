@@ -45,5 +45,41 @@ namespace Spring.Data
             set;
         }
 
+        //
+        // Summary:
+        //     An asynchronous version of System.Data.Common.IDataReaderWrapper.Read, which advances
+        //     the reader to the next record in a result set. This method invokes System.Data.Common.IDataReaderWrapper.ReadAsync(System.Threading.CancellationToken)
+        //     with CancellationToken.None.
+        //
+        // Returns:
+        //     A task representing the asynchronous operation.
+        //
+        // Exceptions:
+        //   T:System.Data.Common.DbException:
+        //     An error occurred while executing the command text.
+        Task<bool> ReadAsync();
+
+        //
+        // Summary:
+        //     This is the asynchronous version of System.Data.Common.IDataReaderWrapper.Read. Providers
+        //     should override with an appropriate implementation. The cancellationToken may
+        //     optionally be ignored. The default implementation invokes the synchronous System.Data.Common.IDataReaderWrapper.Read
+        //     method and returns a completed task, blocking the calling thread. The default
+        //     implementation will return a cancelled task if passed an already cancelled cancellationToken.
+        //     Exceptions thrown by Read will be communicated via the returned Task Exception
+        //     property. Do not invoke other methods and properties of the IDataReaderWrapper object
+        //     until the returned Task is complete.
+        //
+        // Parameters:
+        //   cancellationToken:
+        //     The cancellation instruction.
+        //
+        // Returns:
+        //     A task representing the asynchronous operation.
+        //
+        // Exceptions:
+        //   T:System.Data.Common.DbException:
+        //     An error occurred while executing the command text.
+        Task<bool> ReadAsync(CancellationToken cancellationToken);
     }
 }
